@@ -395,6 +395,11 @@ function syncChips() {
   chips.forEach((chip) => chip.setAttribute('aria-pressed', String(Number(chip.dataset.target) === value)));
 }
 
+// Select a field's contents on focus so typing replaces the starting 0.
+form.addEventListener('focusin', (event) => {
+  if (event.target.matches('input')) event.target.select();
+});
+
 // Results update live as you type.
 form.addEventListener('input', () => {
   syncChips();
