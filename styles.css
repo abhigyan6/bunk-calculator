@@ -16,7 +16,8 @@
   --muted: #494943;
   --footer-ink: #3d3d36;
   --lime: #e4fa58;
-  --lime-confirmed: #d2ee78;
+  --yellow: #ffe14d;
+  --coral: #ff8f7a;
   --pink: #ff91bd;
   --blue: #a9bcff;
   --blue-hover: #bfcdfd;
@@ -37,6 +38,7 @@
 
   /* Motion */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* --------------------------------------------------------------------------
@@ -69,6 +71,18 @@ h2 {
   outline-offset: 5px;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* --------------------------------------------------------------------------
    Layout
    -------------------------------------------------------------------------- */
@@ -85,8 +99,13 @@ h2 {
   align-items: start;
 }
 
+.col {
+  display: grid;
+  gap: 30px;
+}
+
 /* --------------------------------------------------------------------------
-   Header & hero
+   Header, marquee & hero
    -------------------------------------------------------------------------- */
 .site-header {
   display: flex;
@@ -111,9 +130,44 @@ h2 {
   font-weight: 600;
 }
 
+.marquee {
+  margin: 26px 0 0;
+  overflow: hidden;
+  background: var(--yellow);
+  border: var(--border);
+  box-shadow: var(--shadow-sm);
+  transform: rotate(-0.6deg);
+}
+
+.marquee__track {
+  display: flex;
+  width: max-content;
+  animation: marquee 32s linear infinite;
+}
+
+.marquee__group {
+  flex: none;
+  padding: 7px 0;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.marquee:hover .marquee__track {
+  animation-play-state: paused;
+}
+
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 h1 {
   max-width: 850px;
-  margin: 42px 0 18px;
+  margin: 36px 0 18px;
   font: 900 clamp(46px, 7vw, 78px) / 1.02 var(--font-sans);
   letter-spacing: -4px;
 }
@@ -127,11 +181,95 @@ h1 span {
   transform: rotate(-3deg);
 }
 
+h1 span.pop {
+  animation: hero-pop 420ms var(--ease-spring);
+}
+
+@keyframes hero-pop {
+  0% {
+    transform: rotate(-3deg) scale(1);
+  }
+  40% {
+    transform: rotate(-6deg) scale(1.12);
+  }
+  100% {
+    transform: rotate(-3deg) scale(1);
+  }
+}
+
 .intro {
   max-width: 650px;
   margin: 24px 0 30px;
   color: var(--ink-soft);
   font-size: 17px;
+}
+
+/* --------------------------------------------------------------------------
+   Buttons (primary, ghost, small, chips)
+   -------------------------------------------------------------------------- */
+.btn {
+  --lift: 6px;
+
+  padding: 16px 20px;
+  background: var(--panel);
+  border: var(--border-thin);
+  border-radius: 0;
+  box-shadow: var(--lift) var(--lift) 0 var(--ink);
+  color: var(--ink);
+  cursor: pointer;
+  font: 900 17px var(--font-sans);
+  transition:
+    transform 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out),
+    background-color 140ms var(--ease-out);
+}
+
+.btn--primary {
+  background: var(--blue);
+}
+
+.btn--small {
+  --lift: 3px;
+
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.btn--chip[aria-pressed='true'] {
+  background: var(--lime);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover {
+    box-shadow: calc(var(--lift) + 2px) calc(var(--lift) + 2px) 0 var(--ink);
+    transform: translate(-2px, -2px);
+  }
+
+  .btn--primary:hover {
+    background: var(--blue-hover);
+    animation: wiggle 450ms var(--ease-out);
+  }
+}
+
+.btn:active {
+  box-shadow: 0 0 0 var(--ink);
+  transform: translate(var(--lift), var(--lift));
+}
+
+@keyframes wiggle {
+  0% {
+    transform: translate(-2px, -2px) rotate(0);
+  }
+  25% {
+    transform: translate(-2px, -2px) rotate(-1.4deg);
+  }
+  55% {
+    transform: translate(-2px, -2px) rotate(1.2deg);
+  }
+  100% {
+    transform: translate(-2px, -2px) rotate(0);
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -182,8 +320,14 @@ input:focus {
   margin-top: 5px;
   color: var(--muted);
   font-size: 12px;
-  font-weight: 400;
   line-height: 1.4;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 #current {
@@ -193,6 +337,13 @@ input:focus {
   border-left: 4px solid var(--ink);
   font-size: 14px;
   font-weight: 600;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  margin-top: 24px;
 }
 
 .error {
@@ -207,66 +358,215 @@ input:focus {
 }
 
 /* --------------------------------------------------------------------------
-   Button
+   Bunk-o-meter
    -------------------------------------------------------------------------- */
-button {
-  width: 100%;
-  margin-top: 24px;
-  padding: 16px;
-  background: var(--blue);
+.meter {
+  padding: 26px;
+  background: var(--panel);
+  border: var(--border);
+  box-shadow: var(--shadow-lg);
+}
+
+.meter h2 {
+  margin-bottom: 0;
+}
+
+.meter__track {
+  position: relative;
+  height: 34px;
+  margin: 44px 0 0;
+  background: #fff;
+  border: var(--border);
+}
+
+.meter__ghost,
+.meter__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  transition: width 500ms var(--ease-out);
+}
+
+.meter__ghost {
+  background: repeating-linear-gradient(45deg, var(--lime) 0 6px, #fff 6px 12px);
+}
+
+.meter__fill {
+  background: var(--lime);
+  border-right: var(--border);
+}
+
+.meter__fill.is-short {
+  background: var(--coral);
+}
+
+.meter__target {
+  position: absolute;
+  top: -12px;
+  bottom: -12px;
+  left: 75%;
+  width: 4px;
+  margin-left: -2px;
+  background: var(--ink);
+  transition: left 500ms var(--ease-out);
+}
+
+.meter__target span {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  margin-bottom: 4px;
+  padding: 2px 8px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.meter__target.is-late span {
+  left: auto;
+  right: -2px;
+  transform: none;
+}
+
+.meter__legend,
+.plan__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 16px 0 0;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  list-style: none;
+}
+
+.meter__legend li,
+.plan__legend li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.key {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
   border: var(--border-thin);
-  border-radius: 0;
-  box-shadow: 4px 4px 0 var(--ink);
-  color: var(--ink);
-  cursor: pointer;
-  font: 900 17px var(--font-sans);
-  transition:
-    transform 140ms var(--ease-out),
-    box-shadow 140ms var(--ease-out),
-    background-color 140ms var(--ease-out);
 }
 
-@media (hover: hover) and (pointer: fine) {
-  button:hover {
-    background: var(--blue-hover);
-    box-shadow: var(--shadow-md);
-    transform: translate(-1px, -1px);
-  }
+.key--now {
+  background: linear-gradient(135deg, var(--coral) 50%, var(--lime) 50%);
 }
 
-button:active {
-  box-shadow: 0 0 0 var(--ink);
-  transform: translate(4px, 4px);
+.key--best {
+  background: repeating-linear-gradient(45deg, var(--lime) 0 3px, #fff 3px 6px);
+}
+
+.key--attend {
+  background: var(--ink);
+}
+
+.key--bunk {
+  background: var(--panel);
+}
+
+.meter__text {
+  margin: 12px 0 0;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 /* --------------------------------------------------------------------------
    Result card
    -------------------------------------------------------------------------- */
 .result {
+  --tilt: 0.8deg;
+  --mood-bg: var(--lime);
+
   padding: 28px;
-  background: var(--lime);
+  background: var(--mood-bg);
   border: var(--border);
   box-shadow: var(--shadow-lg);
   color: var(--ink);
-  transition: background-color 220ms var(--ease-out);
+  transform: rotate(var(--tilt));
+  transition: background-color 300ms var(--ease-out);
 }
 
-.result.confirmed {
-  background: var(--lime-confirmed);
+.result[data-mood='tight'] {
+  --mood-bg: var(--yellow);
+}
+
+.result[data-mood='doomed'] {
+  --mood-bg: var(--coral);
+}
+
+.result[data-mood='empty'] {
+  --mood-bg: var(--blue);
+}
+
+.result.pop {
+  animation: card-pop 380ms var(--ease-spring);
+}
+
+@keyframes card-pop {
+  0% {
+    transform: rotate(var(--tilt)) scale(1);
+  }
+  40% {
+    transform: rotate(calc(var(--tilt) * 0.3)) scale(1.02);
+  }
+  100% {
+    transform: rotate(var(--tilt)) scale(1);
+  }
 }
 
 .result h2 {
   margin: 22px 0 12px;
 }
 
+/* The "stamp" */
 .badge {
   display: inline-block;
-  padding: 6px 10px;
+  padding: 6px 14px;
   background: var(--panel);
-  border: var(--border-thin);
+  border: var(--border);
   box-shadow: var(--shadow-sm);
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  outline: 2px dashed var(--ink);
+  outline-offset: -8px;
+  text-transform: uppercase;
+  transform: rotate(-4deg);
+}
+
+.badge--error {
+  background: var(--red);
+  color: #fff;
+  outline-color: #fff;
+}
+
+.badge.slam {
+  animation: slam 420ms var(--ease-out);
+}
+
+@keyframes slam {
+  0% {
+    opacity: 0;
+    transform: rotate(-4deg) scale(2.2);
+  }
+  60% {
+    opacity: 1;
+    transform: rotate(-4deg) scale(0.9);
+  }
+  100% {
+    transform: rotate(-4deg) scale(1);
+  }
 }
 
 .big {
@@ -286,6 +586,46 @@ button:active {
 
 .detail {
   font-size: 15px;
+}
+
+/* Class-by-class plan bar */
+.plan__title {
+  margin: 24px 0 10px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.plan__bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18px, 1fr));
+  gap: 5px;
+}
+
+.seg {
+  height: 20px;
+  border: var(--border-thin);
+}
+
+.seg--attend {
+  background: var(--ink);
+}
+
+.seg--bunk {
+  background: var(--panel);
+}
+
+.plan__bar.is-animated .seg {
+  animation: seg-in 300ms var(--ease-spring) both;
+  animation-delay: calc(var(--i) * 12ms);
+}
+
+@keyframes seg-in {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
 }
 
 .stats {
@@ -312,10 +652,72 @@ button:active {
 }
 
 /* --------------------------------------------------------------------------
+   Cat meme polaroid
+   -------------------------------------------------------------------------- */
+.cat {
+  margin: 30px 0 0;
+  padding: 10px 10px 12px;
+  background: #fff;
+  border: var(--border);
+  box-shadow: var(--shadow-md);
+  transform: rotate(-1.8deg);
+}
+
+.cat__frame {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: repeating-linear-gradient(45deg, #eee 0 10px, #f8f8f8 10px 20px);
+  border: var(--border-thin);
+}
+
+.cat__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 250ms var(--ease-out);
+}
+
+.cat__frame.is-loaded .cat__img {
+  opacity: 1;
+}
+
+.cat__status {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.cat__frame.is-loaded .cat__status {
+  display: none;
+}
+
+.cat__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.cat__caption {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+/* --------------------------------------------------------------------------
    Footer & utilities
    -------------------------------------------------------------------------- */
 .site-footer {
-  margin-top: 36px;
+  margin-top: 40px;
   padding-top: 18px;
   border-top: var(--border-thin);
   color: var(--footer-ink);
@@ -331,6 +733,10 @@ button:active {
   margin: 0;
   padding: 16px;
   text-align: center;
+}
+
+[hidden] {
+  display: none !important;
 }
 
 /* --------------------------------------------------------------------------
@@ -356,8 +762,12 @@ button:active {
     text-align: right;
   }
 
+  .marquee {
+    margin-top: 20px;
+  }
+
   h1 {
-    margin-top: 35px;
+    margin-top: 30px;
     font-size: clamp(42px, 10vw, 68px);
     letter-spacing: -2.5px;
   }
@@ -375,12 +785,36 @@ button:active {
     gap: 26px;
   }
 
+  .col {
+    display: contents;
+  }
+
+  /* Phone order: form, then the result card, then the meter */
+  form {
+    order: 1;
+  }
+
+  .result {
+    --tilt: 0.4deg;
+
+    order: 2;
+  }
+
+  .meter {
+    order: 3;
+  }
+
   .fields {
     gap: 16px;
   }
 
+  .actions {
+    grid-template-columns: 1fr;
+  }
+
   form,
-  .result {
+  .result,
+  .meter {
     padding: 22px 18px;
     box-shadow: var(--shadow-md);
   }
@@ -398,21 +832,40 @@ button:active {
    Reduced motion
    -------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
-  button {
+  .marquee__track {
+    animation: none;
+  }
+
+  .btn {
     transition: background-color 140ms var(--ease-out);
   }
 
-  button:active {
+  .btn:active {
     transform: none;
   }
 
-  .result {
+  .meter__ghost,
+  .meter__fill,
+  .meter__target,
+  .result,
+  .cat__img {
     transition: none;
+  }
+
+  .result.pop,
+  .badge.slam,
+  h1 span.pop,
+  .plan__bar.is-animated .seg {
+    animation: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) and (hover: hover) and (pointer: fine) {
-  button:hover {
+  .btn:hover {
     transform: none;
+  }
+
+  .btn--primary:hover {
+    animation: none;
   }
 }
