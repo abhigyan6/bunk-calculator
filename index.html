@@ -3,45 +3,68 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Bunk calculator — The 75% plan</title>
+    <title>Bunk calculator</title>
     <meta
       name="description"
-      content="Enter your attendance and the classes still to come. Find out exactly how many classes you need to attend, and how many you can safely bunk."
+      content="Type in your attendance and how many classes are left. See how many you have to go to, how many you can skip, and what happens if you skip more."
     />
     <meta name="theme-color" content="#f4efdf" />
+    <link rel="canonical" href="https://bunkcalc.abhigyandwivedi.me/" />
+
+    <!-- Link previews (WhatsApp, Discord, X, iMessage...) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Bunk calculator" />
+    <meta
+      property="og:description"
+      content="Stay above 75%. Bunk the rest. Work out how many classes you can actually skip."
+    />
+    <meta property="og:url" content="https://bunkcalc.abhigyandwivedi.me/" />
+    <meta property="og:image" content="https://bunkcalc.abhigyandwivedi.me/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Bunk calculator: Stay above 75%. Bunk the rest." />
+    <meta name="twitter:card" content="summary_large_image" />
+
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23e4fa58'/%3E%3Ctext x='16' y='23' font-family='Arial' font-size='20' font-weight='900' text-anchor='middle' fill='%23171717'%3E%25%3C/text%3E%3C/svg%3E"
     />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700;800&display=swap"
+    />
     <link rel="stylesheet" href="styles.css" />
+    <script src="sfx.js" defer></script>
     <script src="script.js" defer></script>
   </head>
 
   <body>
-    <div class="page">
+    <div class="page" id="top">
       <header class="site-header">
-        <div class="brand">Bunk calculator <span aria-hidden="true">↗</span></div>
-        <p class="tag">A little maths. A better attendance plan.</p>
+        <div class="brand">Bunk calculator</div>
+        <p class="tag">Because 74.9% is not 75%.</p>
       </header>
 
       <div class="marquee" aria-hidden="true">
         <div class="marquee__track">
           <span class="marquee__group">
-            Bunk smart ★ 75% or bust ★ Attend responsibly ★ Maths never lies ★ Bunk smart ★ 75% or bust ★ Attend
-            responsibly ★ Maths never lies ★
+            74.9% is not 75% ★ Count before you skip ★ The cat is watching ★ No proxies in here ★ 74.9% is not 75% ★
+            Count before you skip ★ The cat is watching ★ No proxies in here ★
           </span>
           <span class="marquee__group">
-            Bunk smart ★ 75% or bust ★ Attend responsibly ★ Maths never lies ★ Bunk smart ★ 75% or bust ★ Attend
-            responsibly ★ Maths never lies ★
+            74.9% is not 75% ★ Count before you skip ★ The cat is watching ★ No proxies in here ★ 74.9% is not 75% ★
+            Count before you skip ★ The cat is watching ★ No proxies in here ★
           </span>
         </div>
       </div>
 
       <main>
-        <h1>Make it to <span id="heroTarget">75%.</span><br />Know what it takes.</h1>
+        <h1>Stay above <span id="heroTarget">75%.</span><br />Bunk the rest.</h1>
         <p class="intro">
-          Enter your attendance and the classes still to come. Find out exactly when to show up,
-          and when you have room to bunk.
+          Put in what you’ve attended and how many classes are left. You’ll see how many you have to go to,
+          and how many you can skip.
         </p>
 
         <div class="layout">
@@ -92,8 +115,7 @@
               <p id="current"></p>
 
               <div class="actions">
-                <button type="submit" class="btn btn--primary">Calculate my plan →</button>
-                <button type="reset" class="btn btn--ghost">Reset</button>
+                <button type="reset" class="btn btn--small btn--ghost">Reset</button>
               </div>
               <p id="error" class="error" role="alert"></p>
             </form>
@@ -104,12 +126,20 @@
                 <div class="meter__ghost" id="meterGhost"></div>
                 <div class="meter__fill" id="meterFill"></div>
                 <div class="meter__target" id="meterTarget"><span id="meterTargetLabel">Target 75%</span></div>
+                <div class="meter__skip" id="meterSkip" aria-hidden="true"></div>
               </div>
               <ul class="meter__legend">
                 <li><i class="key key--now"></i>You right now</li>
                 <li><i class="key key--best"></i>If you attend everything</li>
+                <li><i class="key key--skip"></i>If you skip</li>
               </ul>
               <p class="meter__text" id="meterText"></p>
+
+              <div class="whatif">
+                <label for="skip">What if I skip…</label>
+                <input id="skip" name="skip" type="range" min="0" max="0" step="1" value="0" aria-describedby="skipText" />
+                <p class="whatif__text" id="skipText"></p>
+              </div>
             </section>
           </div>
 
@@ -126,7 +156,7 @@
             <p class="detail" id="detail"></p>
 
             <div class="plan" id="planWrap">
-              <p class="plan__title">Your plan, class by class</p>
+              <p class="plan__title">Class by class</p>
               <div class="plan__bar" id="planBar" role="img"></div>
               <ul class="plan__legend">
                 <li><i class="key key--attend"></i>Show up</li>
@@ -146,6 +176,11 @@
               </div>
             </div>
 
+            <div class="share">
+              <button type="button" class="btn btn--small btn--primary" id="copyLink">Copy link to this result</button>
+              <span class="sr-only" id="copyStatus" role="status"></span>
+            </div>
+
             <figure class="cat" id="cat">
               <div class="cat__frame" id="catFrame">
                 <img class="cat__img" id="catImg" alt="" width="520" height="390" referrerpolicy="no-referrer" />
@@ -163,12 +198,46 @@
       </main>
 
       <footer class="site-footer">
-        <p>
-          Every class counts equally. Calculations use exact percentages, so a rounded 75% does not
-          count as meeting the target. Cat photos come from cataas.com.
-        </p>
+        <p class="footer-lead">Count before you <span>skip.</span></p>
+
+        <div class="site-footer__grid">
+          <section aria-labelledby="footer-about">
+            <h2 class="footer-title" id="footer-about">Bunk calculator</h2>
+            <p>
+              A small tool for working out how many classes you can skip without dropping under your attendance
+              target.
+            </p>
+          </section>
+
+          <section aria-labelledby="footer-maths">
+            <h2 class="footer-title" id="footer-maths">The maths</h2>
+            <p class="footer-formula">must attend = ⌈ target% × (held + left) ⌉ − attended</p>
+            <p>Nothing gets rounded to be nice. 74.9% shows up as 75% on a calculator, but not on the register.</p>
+          </section>
+
+          <nav aria-labelledby="footer-links">
+            <h2 class="footer-title" id="footer-links">Links</h2>
+            <ul class="footer-links">
+              <li><a class="ext" href="https://github.com/abhigyan6/bunk-calculator" rel="noopener">Source on GitHub</a></li>
+              <li><a class="ext" href="https://github.com/abhigyan6" rel="noopener">More from abhigyan6</a></li>
+            </ul>
+          </nav>
+        </div>
+
+        <div class="site-footer__legal">
+          <div>
+            <p>© 2026 Abhigyan Dwivedi. Your numbers stay in your browser.</p>
+            <p>
+              Cat photos from <a class="ext" href="https://cataas.com" rel="noopener">cataas.com</a>. Type set in
+              JetBrains Mono and Arial.
+            </p>
+          </div>
+          <a class="btn btn--small btn--yellow" href="#top">↑ Back to top</a>
+        </div>
       </footer>
     </div>
+
+    <button type="button" class="btn btn--small btn--ghost sfx-toggle" id="sfxToggle">Sound: on</button>
 
     <noscript>
       <p class="noscript">This calculator needs JavaScript to run.</p>

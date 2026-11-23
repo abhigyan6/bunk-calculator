@@ -12,8 +12,15 @@ const MAX_BLOCKS = 60;
 const COUNT_UP_MS = 450;
 /** Delay before screen readers hear a live update (avoids chatter while typing). */
 const ANNOUNCE_DELAY_MS = 600;
+/** If the cat photo hasn't arrived by now, show the hand-drawn cat instead. */
+const CAT_FALLBACK_AFTER_MS = 6000;
+/** How long "Copied!" stays on the share button. */
+const COPIED_MS = 1500;
 
 const CAT_ENDPOINT = 'https://cataas.com/cat';
+const STORAGE_KEY = 'bunk-inputs';
+const FIELD_KEYS = ['held', 'attended', 'remaining', 'target'];
+const DEFAULTS = { held: 0, attended: 0, remaining: 0, target: 75 };
 
 /** Everything that changes with the verdict: stamp, cat photo tags, meme lines. */
 const MOODS = {
@@ -21,25 +28,29 @@ const MOODS = {
     stamp: 'Bunk-safe',
     tags: ['chill', 'cool', 'smug', 'happy'],
     lines: ['bunk time', 'you have my permission', 'go touch grass', 'skip it, i dare you'],
-    captions: ['Approved by the committee of cats.', 'This cat has seen your numbers.'],
+    captions: ['Cat says you’re fine.', 'The cat did the maths. You’re fine.'],
+    fallback: { src: 'cats/chill.svg', alt: 'Hand-drawn cat in sunglasses saying: bunk time' },
   },
   tight: {
     stamp: 'No slack',
     tags: ['serious', 'judging', 'grumpy', 'angry'],
     lines: ['attend everything', 'no skipping', 'i am watching you', 'sit. in. class.'],
-    captions: ['This cat is not impressed.', 'Every class counts. The cat said so.'],
+    captions: ['Cat says no.', 'This cat is not impressed.'],
+    fallback: { src: 'cats/tight.svg', alt: 'Hand-drawn cat glaring, saying: attend everything' },
   },
   doomed: {
     stamp: 'Danger zone',
     tags: ['crying', 'depressed', 'disappointed', 'shocked', 'scared'],
     lines: ['it is over', 'the maths said no', 'pain', 'i have seen the numbers'],
-    captions: ['The cat saw the maths too.', 'Moment of silence.'],
+    captions: ['Even the cat is worried.', 'A moment of silence.'],
+    fallback: { src: 'cats/doomed.svg', alt: 'Hand-drawn crying cat saying: it is over' },
   },
   empty: {
     stamp: 'Waiting',
     tags: ['asleep', 'sleepy', 'sleeping'],
     lines: ['no classes yet', 'nap time', 'too early for this'],
-    captions: ['Nothing to worry about yet.', 'Enjoy the quiet.'],
+    captions: ['Nothing to do yet.', 'Cat is asleep. Be like cat.'],
+    fallback: { src: 'cats/empty.svg', alt: 'Hand-drawn sleeping cat saying: no classes yet' },
   },
 };
 
@@ -88,27 +99,34 @@ function additionalClassesNeeded({ held, attended, remaining, target }) {
   return Math.max(0, required - remaining);
 }
 
-/** Returns an error message, or an empty string when the inputs are valid. */
-function validate({ held, attended, remaining, target }) {
-  const values = [held, attended, remaining, target];
-  const counts = [held, attended, remaining];
+/**
+ * Checks the inputs. Returns the message to show and which fields caused it;
+ * `error` is an empty string when everything is valid.
+ */
+function validate(input) {
+  const { held, attended, remaining, target } = input;
+  const keys = Object.keys(input);
+  const counts = ['held', 'attended', 'remaining'];
 
-  if (values.some((value) => !Number.isFinite(value))) {
-    return 'Fill in all four fields with valid numbers.';
+  const missing = keys.filter((key) => !Number.isFinite(input[key]));
+  if (missing.length) {
+    return { error: 'Fill in all four fields with valid numbers.', fields: missing };
   }
-  if (counts.some((value) => !Number.isSafeInteger(value) || value < 0)) {
-    return 'Class counts must be non-negative whole numbers.';
+
+  const badCounts = counts.filter((key) => !Number.isSafeInteger(input[key]) || input[key] < 0);
+  if (badCounts.length) {
+    return { error: 'Class counts must be non-negative whole numbers.', fields: badCounts };
   }
   if (attended > held) {
-    return 'Classes attended cannot exceed classes held.';
+    return { error: 'Classes attended cannot exceed classes held.', fields: ['attended', 'held'] };
   }
   if (target <= 0 || target > 100) {
-    return 'Required attendance must be greater than 0 and at most 100%.';
+    return { error: 'Required attendance must be greater than 0 and at most 100%.', fields: ['target'] };
   }
   if (!Number.isSafeInteger(held + remaining)) {
-    return 'That class total is too large.';
+    return { error: 'That class total is too large.', fields: ['held', 'remaining'] };
   }
-  return '';
+  return { error: '', fields: [] };
 }
 
 function moodOf(plan) {
@@ -125,9 +143,9 @@ function moodOf(plan) {
 function verdictText(plan) {
   if (plan.total === 0) return 'No classes, no bunking. Yet.';
   if (!plan.possible) return 'The maths has called a parent-teacher meeting.';
-  if (plan.bunks === 0) return 'Your seat needs a full-time commitment.';
-  if (plan.needed === 0) return 'You’ve earned some breathing room.';
-  return `Your ${plan.bunks} ${pluralise(plan.bunks, 'class', 'classes')} of freedom. Use wisely.`;
+  if (plan.bunks === 0) return 'No room to skip. Every class from here.';
+  if (plan.needed === 0) return 'Zero needed. You’re already safe.';
+  return `You can skip ${plan.bunks} ${pluralise(plan.bunks, 'class', 'classes')}. Don’t be greedy.`;
 }
 
 function detailText(plan, input) {
@@ -137,15 +155,77 @@ function detailText(plan, input) {
     return 'Add the classes scheduled for this term to build your plan.';
   }
   if (plan.possible) {
-    return `Attend at least ${plan.needed} of the next ${remaining} classes to finish at or above ${target}%. You can miss up to ${plan.bunks}.`;
+    return `Go to at least ${plan.needed} of the next ${remaining} classes to finish on ${target}% or more. You can miss up to ${plan.bunks}.`;
   }
 
   const shortfall =
     target === 100
-      ? 'Reaching 100% is impossible once a class has been missed.'
-      : `You would need ${additionalClassesNeeded(input)} additional classes beyond those scheduled, attending all of them, to reach ${target}%.`;
+      ? 'Once you’ve missed a class, 100% is gone.'
+      : `You’d need ${additionalClassesNeeded(input)} more classes than are scheduled, and you’d have to attend every one.`;
 
-  return `Even with perfect attendance from now on, you’ll finish at ${plan.best.toFixed(2)}%, below ${target}%. ${shortfall}`;
+  return `Even if you go to every class from here, you’ll finish on ${plan.best.toFixed(2)}%, which is below ${target}%. ${shortfall}`;
+}
+
+/* --------------------------------------------------------------------------
+   Saved inputs and shareable links
+   -------------------------------------------------------------------------- */
+
+const toInput = (raw) =>
+  Object.fromEntries(FIELD_KEYS.map((key) => [key, raw[key] === '' || raw[key] == null ? NaN : Number(raw[key])]));
+
+/** Only inputs that pass validation are ever loaded from a link or from storage. */
+const isUsable = (raw) => Boolean(raw) && validate(toInput(raw)).error === '';
+
+const isDefault = (input) => FIELD_KEYS.every((key) => input[key] === DEFAULTS[key]);
+
+function readFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  if (!FIELD_KEYS.every((key) => params.has(key))) return null;
+  const raw = Object.fromEntries(FIELD_KEYS.map((key) => [key, params.get(key)]));
+  return isUsable(raw) ? raw : null;
+}
+
+function readFromStorage() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    return isUsable(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Keeps the address bar and localStorage in step with the current inputs. */
+function persist(input) {
+  const clean = isDefault(input);
+  try {
+    if (clean) localStorage.removeItem(STORAGE_KEY);
+    else localStorage.setItem(STORAGE_KEY, JSON.stringify(input));
+  } catch {
+    // Storage can be blocked; the link below still works.
+  }
+  try {
+    const query = clean ? '' : `?${new URLSearchParams(input)}`;
+    window.history.replaceState(null, '', `${window.location.pathname}${query}`);
+  } catch {
+    // Some contexts (like file://) don't allow this; sharing still works.
+  }
+}
+
+function shareUrl(input) {
+  const url = new URL(window.location.href);
+  url.search = new URLSearchParams(input).toString();
+  url.hash = '';
+  return url.href;
+}
+
+/** A link beats saved data, which beats the defaults. */
+function applyInitialValues() {
+  const start = readFromUrl() ?? readFromStorage();
+  if (!start) return;
+  FIELD_KEYS.forEach((key) => {
+    fields[key].value = start[key];
+  });
+  syncChips();
 }
 
 /* --------------------------------------------------------------------------
@@ -186,7 +266,7 @@ function tweenNumber(element, to) {
 }
 
 /* --------------------------------------------------------------------------
-   Cat meme
+   Cat meme (with a hand-drawn fallback)
    -------------------------------------------------------------------------- */
 
 const cat = {
@@ -195,28 +275,51 @@ const cat = {
   status: $('catStatus'),
   caption: $('catCaption'),
   mood: null,
+  usingFallback: false,
+  timer: null,
 };
+
+/** Swaps in the drawing that ships with the site. */
+function showFallbackCat() {
+  clearTimeout(cat.timer);
+  const { src, alt } = MOODS[cat.mood ?? 'chill'].fallback;
+  cat.usingFallback = true;
+  cat.img.alt = alt;
+  cat.img.src = src;
+}
 
 function loadCat(mood, { force = false } = {}) {
   if (!force && cat.mood === mood) return;
   cat.mood = mood;
+  cat.usingFallback = false;
+  clearTimeout(cat.timer);
 
   const { tags, lines, captions } = MOODS[mood];
   const line = pick(lines);
-  // `cb` is just a cache-buster (note: `r` is a real API parameter, the red channel).
   // Ask for the exact 4:3 frame size so the meme text isn't cropped off the bottom.
+  // `cb` is just a cache-buster (note: `r` is a real API parameter, the red channel).
   const params = new URLSearchParams({ width: 520, height: 390, fontSize: 38, fontColor: 'white', cb: Date.now() });
 
-  cat.frame.classList.remove('is-loaded');
+  cat.frame.classList.remove('is-loaded', 'is-broken');
   cat.status.textContent = 'Fetching a cat…';
   cat.caption.textContent = pick(captions);
   cat.img.alt = `Cat meme saying: ${line}`;
   cat.img.src = `${CAT_ENDPOINT}/${pick(tags)}/says/${encodeURIComponent(line)}?${params}`;
+  cat.timer = setTimeout(showFallbackCat, CAT_FALLBACK_AFTER_MS);
 }
 
-cat.img.addEventListener('load', () => cat.frame.classList.add('is-loaded'));
+cat.img.addEventListener('load', () => {
+  clearTimeout(cat.timer);
+  cat.frame.classList.add('is-loaded');
+});
+
 cat.img.addEventListener('error', () => {
+  if (!cat.usingFallback) {
+    showFallbackCat(); // the photo site is down or blocked
+    return;
+  }
   cat.frame.classList.remove('is-loaded');
+  cat.frame.classList.add('is-broken');
   cat.status.textContent = 'The cat declined to show up.';
 });
 
@@ -238,12 +341,19 @@ const els = {
   meterGhost: $('meterGhost'),
   meterTarget: $('meterTarget'),
   meterTargetLabel: $('meterTargetLabel'),
+  meterSkip: $('meterSkip'),
   meterText: $('meterText'),
+  skip: $('skip'),
+  skipText: $('skipText'),
   summary: $('summary'),
 };
 
 let currentMood = null;
 let announceTimer;
+/** The latest valid inputs and plan, so the slider and share link can use them. */
+let last = null;
+/** Until the slider is touched it follows the "safe to skip" number. */
+let skipTouched = false;
 
 function announce(text) {
   clearTimeout(announceTimer);
@@ -324,12 +434,46 @@ function renderMeter({ held, attended, target }, plan) {
   );
 }
 
+/** "What if I skip N classes?" slider and the matching marker on the meter. */
+function renderWhatIf() {
+  if (!last) return;
+  const { input, plan } = last;
+  const { attended, remaining } = input;
+  const canSkip = plan.total > 0 && remaining > 0;
+
+  els.skip.max = remaining;
+  els.skip.disabled = !canSkip;
+  if (!skipTouched) els.skip.value = plan.possible ? plan.bunks : 0;
+
+  const skip = Math.min(Number(els.skip.value), remaining);
+  els.skip.value = skip;
+  els.meterSkip.hidden = !canSkip;
+
+  if (!canSkip) {
+    els.skipText.textContent = 'No classes left to skip.';
+    els.skipText.removeAttribute('data-safe');
+    els.skip.setAttribute('aria-valuetext', els.skipText.textContent);
+    return;
+  }
+
+  const final = (100 * (attended + remaining - skip)) / plan.total;
+  const safe = plan.possible && skip <= plan.bunks;
+
+  els.skipText.textContent = `Skip ${skip} ${pluralise(skip, 'class', 'classes')} and you finish on ${final.toFixed(2)}%. ${
+    safe ? 'Still safe.' : 'Below the line.'
+  }`;
+  els.skipText.dataset.safe = String(safe);
+  els.skip.setAttribute('aria-valuetext', els.skipText.textContent);
+  els.meterSkip.style.left = `${clampPercent(final)}%`;
+}
+
 function render(input, { animate, newCat }) {
   const { held, attended, remaining, target } = input;
   const plan = calculatePlan(input);
   const mood = moodOf(plan);
   const moodChanged = mood !== currentMood;
   currentMood = mood;
+  last = { input, plan };
 
   // Stamp, card colour, hero target.
   els.result.dataset.mood = mood;
@@ -364,16 +508,22 @@ function render(input, { animate, newCat }) {
 
   renderPlanBar(plan, remaining, animate);
   renderMeter(input, plan);
+  renderWhatIf();
   loadCat(mood, { force: newCat });
+  persist(input);
   announce(`${verdict} ${detail}`);
 }
 
 /** Validates, renders, and returns true when the inputs were valid. */
 function calculate({ animate = false, newCat = false } = {}) {
   const input = readInputs();
-  const error = validate(input);
+  const { error, fields: badFields } = validate(input);
 
   $('error').textContent = error;
+  Object.entries(fields).forEach(([key, field]) => {
+    if (badFields.includes(key)) field.setAttribute('aria-invalid', 'true');
+    else field.removeAttribute('aria-invalid');
+  });
 
   if (error) {
     els.badge.textContent = 'Check inputs';
@@ -406,16 +556,27 @@ form.addEventListener('input', () => {
   calculate();
 });
 
-// The button adds the fanfare: a fresh cat, the stamp, the card pop.
+/** The fanfare: a fresh cat, the stamp slam, the card pop. */
+function celebrate() {
+  if (!calculate({ animate: true, newCat: true })) {
+    form.querySelector('[aria-invalid="true"]')?.focus();
+  }
+}
+
+// There is no submit button (results are live), so Enter in a field is what triggers the fanfare.
+form.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' || event.isComposing || !event.target.matches('input')) return;
+  event.preventDefault();
+  celebrate();
+});
+
 form.addEventListener('submit', (event) => {
   event.preventDefault();
-
-  if (!calculate({ animate: true, newCat: true })) {
-    form.querySelector('input:invalid')?.focus();
-  }
+  celebrate();
 });
 
 form.addEventListener('reset', () => {
+  skipTouched = false;
   // Wait for the browser to restore the default values first.
   setTimeout(() => {
     syncChips();
@@ -430,4 +591,34 @@ chips.forEach((chip) => {
   });
 });
 
+els.skip.addEventListener('input', () => {
+  skipTouched = true;
+  renderWhatIf();
+});
+
+const copyButton = $('copyLink');
+const copyLabel = copyButton.textContent;
+let copyTimer;
+
+copyButton.addEventListener('click', async () => {
+  if (!last) return;
+  const url = shareUrl(last.input);
+
+  try {
+    await navigator.clipboard.writeText(url);
+  } catch {
+    window.prompt('Copy this link:', url); // clipboard blocked: let them copy by hand
+    return;
+  }
+
+  copyButton.textContent = 'Copied!';
+  $('copyStatus').textContent = 'Link copied.';
+  clearTimeout(copyTimer);
+  copyTimer = setTimeout(() => {
+    copyButton.textContent = copyLabel;
+    $('copyStatus').textContent = '';
+  }, COPIED_MS);
+});
+
+applyInitialValues();
 calculate();
